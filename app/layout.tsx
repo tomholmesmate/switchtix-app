@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d0b1a",
+  themeColor: "#120d26",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -25,7 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <header className="topbar">
           <Link href={user ? "/collection" : "/"} className="brand">
-            Switch<span>Tix</span>
+            <img src="/logo.svg" alt="SwitchTix" />
           </Link>
           {user && (
             <nav>
