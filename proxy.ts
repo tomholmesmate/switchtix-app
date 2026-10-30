@@ -27,7 +27,7 @@ export async function proxy(request: NextRequest) {
 
   if (!data.user && PROTECTED.some((p) => path === p || path.startsWith(p + "/"))) {
     const home = request.nextUrl.clone();
-    home.pathname = "/";
+    home.pathname = "/signin";
     home.search = `?next=${encodeURIComponent(path)}`;
     return NextResponse.redirect(home);
   }

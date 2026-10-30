@@ -16,7 +16,7 @@ export default async function Deals() {
       <h1>Deals</h1>
       <p className="muted">
         Sell tickets to anyone with a deal link. The buyer’s money is held by SwitchTix until they confirm the tickets
-        arrived, so nobody has to go first on trust. <strong>Beta: Stripe test cards only, no real money.</strong>
+        arrived, so nobody has to go first on trust. You keep your full price. <strong>Beta: Stripe test cards only, no real money.</strong>
       </p>
       <div className="actions">
         <Link className="btn" href="/deals/new">+ Start a deal</Link>

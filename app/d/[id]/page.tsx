@@ -147,7 +147,7 @@ export default async function DealPage({
           {deal.status === "open" && !isSeller && user && (
             <Action action={startPayment} id={id} label={`Pay ${money(total)} safely`} />
           )}
-          {deal.status === "open" && !user && <Link className="btn" href={`/?next=/d/${id}`}>Sign in to buy</Link>}
+          {deal.status === "open" && !user && <Link className="btn" href={`/signin?next=/d/${id}`}>Sign in to buy</Link>}
 
           {/* Buyer is at checkout */}
           {deal.status === "awaiting_payment" && isBuyer && (
@@ -275,8 +275,9 @@ function EscrowBox({
       if (isBuyer) {
         body = (
           <>
-            Done. {amount} released to {seller}.{" "}
-            <Link href={`/mint?deal=${deal.id}`}>Mint your stub from this deal →</Link>
+            Done. {amount} released to {seller}. Enjoy the show!
+            <br />
+            Got tickets of your own you can’t use? <Link href="/deals/new">Sell them safely with SwitchTix →</Link>
           </>
         );
       } else if (deal.payout_status === "transferred") {

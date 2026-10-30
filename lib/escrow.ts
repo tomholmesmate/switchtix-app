@@ -2,7 +2,8 @@
 import type Stripe from "stripe";
 import { adminClient } from "./supabase";
 import { stripe, stripeEnabled } from "./stripe";
-import { processingFee, type Deal, type DealStatus, type FeeBreakdown } from "./types";
+import { emailUser } from "./notify";
+import { formatDateTime, money, processingFee, type Deal, type DealStatus, type FeeBreakdown } from "./types";
 
 const db = () => adminClient();
 
@@ -38,6 +39,18 @@ export async function syncPayment(deal: Deal): Promise<Deal> {
       charge_id: typeof charge === "string" ? charge : charge?.id ?? null,
       paid_at: new Date().toISOString(),
     });
+    if (updated) {
+      await emailUser(
+        updated.seller_id,
+        `${updated.buyer_name ?? "Your buyer"} paid for your ${updated.event_name} tickets — send them now`,
+        [
+          `Good news: ${updated.buyer_name ?? "your buyer"} paid, and SwitchTix is holding ${money(updated.price_cents)} for you.`,
+          `Now send the tickets using ${updated.ticket_platform ?? "your ticket app"}'s transfer button, then tap "I've sent the tickets" on the deal page.`,
+        ],
+        `/d/${updated.id}`,
+        "Open the deal",
+      );
+    }
     return updated ?? (await getDeal(deal.id)) ?? deal;
   }
 
@@ -75,7 +88,17 @@ export async function release(deal: Deal, reason: "buyer_confirmed" | "auto" | "
     ...(reason === "admin" ? { resolution_note: note ?? null, resolved_at: new Date().toISOString() } : {}),
   });
   if (!released) return null;
-  return payout(released);
+  const paid = await payout(released);
+  await emailUser(
+    paid.seller_id,
+    `Your ${paid.event_name} deal is complete`,
+    paid.payout_status === "transferred"
+      ? [`${money(paid.price_cents)} is on its way to your bank account. Thanks for using SwitchTix.`]
+      : [`${money(paid.price_cents)} has been released to you.`, "Set up payouts once (a short Stripe form) and the money is sent straight away."],
+    paid.payout_status === "transferred" ? `/d/${paid.id}` : "/payouts",
+    paid.payout_status === "transferred" ? "See the deal" : "Set up payouts",
+  );
+  return paid;
 }
 
 /** Sends the held money to the seller's payout account, if they have one ready. */
@@ -128,12 +151,23 @@ export async function refund(deal: Deal, from: DealStatus[], note?: string) {
     { payment_intent: deal.payment_intent_id, metadata: { deal_id: deal.id } },
     { idempotencyKey: `switchtix-refund-${deal.id}` },
   );
-  return transition(deal.id, from, {
+  const refunded = await transition(deal.id, from, {
     status: "refunded",
     refund_id: r.id,
     refunded_at: new Date().toISOString(),
     ...(note ? { resolution_note: note, resolved_at: new Date().toISOString() } : {}),
   });
+  if (refunded) {
+    const amount = refunded.price_cents + (refunded.buyer_fee_cents || 0);
+    await emailUser(
+      refunded.buyer_id,
+      `Refund for ${refunded.event_name}`,
+      [`You've been refunded ${money(amount)}. It usually shows on your card within 5–10 business days.`, ...(note ? [`Note: ${note}`] : [])],
+      `/d/${refunded.id}`,
+      "See the deal",
+    );
+  }
+  return refunded;
 }
 
 /** Pays out any released deals that were waiting for this seller to set up payouts. */

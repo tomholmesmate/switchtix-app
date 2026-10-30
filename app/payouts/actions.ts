@@ -15,7 +15,7 @@ async function baseUrl() {
 /** Creates (or reuses) the seller's Stripe test account and sends them to Stripe's setup form. */
 export async function startPayoutSetup() {
   const user = await currentUser();
-  if (!user) redirect("/?next=/payouts");
+  if (!user) redirect("/signin?next=/payouts");
   if (!stripeEnabled()) redirect("/payouts?error=payments-off");
 
   const db = adminClient();

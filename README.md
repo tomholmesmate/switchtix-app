@@ -1,6 +1,6 @@
 # SwitchTix — friends and family beta
 
-*Safe deals. Forever stubs.*
+*Buy and sell tickets with anyone, without getting scammed.*
 
 An invite-only web app where friends:
 
@@ -83,7 +83,34 @@ update auth.users set raw_app_meta_data = raw_app_meta_data - 'password_set' whe
 
 Problems go to the **Admin** page, where you release to the seller or refund the buyer.
 
-## Part 5 — Turn on minting (optional, free) · ~20 min
+## Part 4b — Google sign-in (optional, free) · ~15 min
+
+1. Go to **console.cloud.google.com** and create a project called `SwitchTix`.
+2. **APIs & Services → OAuth consent screen:** choose *External*, app name `SwitchTix`, your email as support and developer contact. Save.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID:** type *Web application*. Under **Authorized redirect URIs** add `https://YOUR-PROJECT.supabase.co/auth/v1/callback` (your Supabase Project URL + `/auth/v1/callback`). Create, then copy the **Client ID** and **Client secret**.
+4. **Supabase → Authentication → Sign In / Providers → Google:** turn it on and paste the Client ID and secret. Save.
+5. **Vercel → Environment Variables:** add `NEXT_PUBLIC_GOOGLE_SIGNIN` = `on`, then redeploy. The **Continue with Google** button appears on the sign-in page.
+
+## Part 4c — Email updates at each step (optional, free) · ~5 min
+
+Without these, people have to check the app to know it's their turn. With them, the seller gets "Your buyer paid — send the tickets", the buyer gets "Your tickets are on the way", and you get an email for every dispute.
+
+1. Turn on 2-Step Verification on your Google account, then create an app password at **myaccount.google.com/apppasswords** (name it `SwitchTix`).
+2. **Vercel → Environment Variables:** add `SMTP_USER` = your Gmail address and `SMTP_PASS` = the 16-character app password (optionally `SMTP_FROM` = `SwitchTix <you@gmail.com>`). Redeploy.
+
+Gmail allows a few hundred emails a day, plenty for the beta.
+
+## Who can do what during the beta
+
+- **Buy:** anyone who opens a deal link can create an account and pay.
+- **Sell:** only emails on the invite list (`insert into public.invites (email) values ('friend@example.com');`).
+- **Admin:** emails in `ADMIN_EMAILS` see the Admin page for disputes.
+
+## Pricing: break-even and transparent
+
+Sellers receive their full price. The buyer pays a *payment processing* line that equals exactly what Stripe charges for the deal (card 2.9% + 30¢, payout 0.25% + 25¢, and Stripe's $2 monthly fee the first time a seller is paid in a month). SwitchTix keeps $0, and the deal page shows the breakdown. The formula is `processingFee()` in `lib/types.ts`.
+
+## Part 5 — Turn on minting (phase 2, optional, free) · ~20 min
 
 Until this is done, stubs save normally and show "mint coming soon".
 
@@ -116,7 +143,9 @@ New stubs now mint automatically, and each card links to its transaction on sepo
 | Sign-in, database, photos | Supabase (`lib/supabase.ts`, `supabase/schema.sql`) |
 | Minting | viem → `SwitchTixStubs` contract on Base Sepolia (`lib/chain.ts`, `lib/mint.ts`) |
 | Collectible metadata | `/api/metadata/[id]` |
-| Shareable keepsake | `/s/[id]` |
+| Shareable keepsake (phase 2, hidden from the menu) | `/s/[id]`, `/mint`, `/collection` |
+| Homepage and sign-in | `app/page.tsx`, `/signin` |
+| Email updates | `lib/notify.ts` |
 | Deal link and escrow | `/d/[id]`, `lib/escrow.ts`, `app/deals/actions.ts` |
 | Seller payouts | `/payouts` (Stripe Connect Express, test mode) |
 | Disputes | `/admin` |

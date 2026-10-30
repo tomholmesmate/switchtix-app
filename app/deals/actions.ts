@@ -3,9 +3,10 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { feeForDeal, getDeal, isAdmin, refreshDeal, refund, release } from "@/lib/escrow";
+import { emailAdmins, emailUser } from "@/lib/notify";
 import { stripe, stripeEnabled } from "@/lib/stripe";
 import { adminClient, currentUser, siteUrl } from "@/lib/supabase";
-import { AUTO_RELEASE_HOURS, TICKET_PLATFORMS, displayName, type Deal } from "@/lib/types";
+import { AUTO_RELEASE_HOURS, TICKET_PLATFORMS, displayName, formatDateTime, money, type Deal } from "@/lib/types";
 
 function text(form: FormData, key: string, max = 120) {
   const v = String(form.get(key) ?? "").trim().slice(0, max);
@@ -19,9 +20,16 @@ async function baseUrl() {
   return host && !process.env.NEXT_PUBLIC_SITE_URL ? `${proto}://${host}` : siteUrl();
 }
 
+/** During the beta, anyone can buy from a deal link, but only invited people can sell. */
+export async function canSell(email: string | undefined | null) {
+  if (!email) return false;
+  const { data } = await adminClient().from("invites").select("email").eq("email", email.toLowerCase()).maybeSingle();
+  return Boolean(data);
+}
+
 async function signedIn(next: string) {
   const user = await currentUser();
-  if (!user) redirect(`/?next=${encodeURIComponent(next)}`);
+  if (!user) redirect(`/signin?next=${encodeURIComponent(next)}`);
   return user;
 }
 
@@ -31,6 +39,7 @@ function back(id: string, flag?: string): never {
 
 export async function createDeal(form: FormData) {
   const user = await signedIn("/deals/new");
+  if (!(await canSell(user.email))) redirect("/deals/new?error=invite");
   const event_name = text(form, "event_name");
   const platform = text(form, "ticket_platform");
   const price = Number(String(form.get("price") ?? "").replace(/[^0-9.]/g, ""));
@@ -173,16 +182,28 @@ export async function markSent(form: FormData) {
   const deal = await getDeal(id);
   if (!deal || deal.seller_id !== user.id) back(id);
   const now = new Date();
-  await adminClient()
+  const autoRelease = new Date(now.getTime() + AUTO_RELEASE_HOURS * 3600_000).toISOString();
+  const { data: sent } = await adminClient()
     .from("deals")
-    .update({
-      status: "sent",
-      sent_at: now.toISOString(),
-      auto_release_at: new Date(now.getTime() + AUTO_RELEASE_HOURS * 3600_000).toISOString(),
-      updated_at: now.toISOString(),
-    })
+    .update({ status: "sent", sent_at: now.toISOString(), auto_release_at: autoRelease, updated_at: now.toISOString() })
     .eq("id", id)
-    .eq("status", "paid");
+    .eq("status", "paid")
+    .select("*")
+    .maybeSingle();
+  if (sent) {
+    const d = sent as Deal;
+    await emailUser(
+      d.buyer_id,
+      `Your ${d.event_name} tickets are on the way`,
+      [
+        `${d.seller_name ?? "The seller"} says they've sent your tickets through ${d.ticket_platform ?? "the ticket app"}.`,
+        `Open ${d.ticket_platform ?? "the ticket app"}, accept the transfer, then tap "I got the tickets" on SwitchTix.`,
+        `If anything's wrong, tap "Something's wrong" before ${formatDateTime(autoRelease)}. After that, the ${money(d.price_cents)} is released to the seller automatically.`,
+      ],
+      `/d/${d.id}`,
+      "Open the deal",
+    );
+  }
   back(id);
 }
 
@@ -227,6 +248,22 @@ export async function openDispute(form: FormData) {
     })
     .eq("id", id)
     .in("status", ["paid", "sent"]);
+  await emailAdmins(
+    `Dispute on ${deal.event_name} (${money(deal.price_cents)})`,
+    [`${deal.buyer_name ?? "The buyer"} reported a problem with ${deal.seller_name ?? "the seller"}'s deal.`, `They said: "${reason}"`],
+    "/admin",
+    "Review on Admin",
+  );
+  await emailUser(
+    deal.seller_id,
+    `Your buyer reported a problem with ${deal.event_name}`,
+    [
+      `${deal.buyer_name ?? "Your buyer"} says something's wrong. The money is held while Tom reviews it.`,
+      `If you did send the tickets, keep a screenshot of the transfer showing as accepted in ${deal.ticket_platform ?? "your ticket app"}. That settles most cases.`,
+    ],
+    `/d/${deal.id}`,
+    "Open the deal",
+  );
   back(id);
 }
 

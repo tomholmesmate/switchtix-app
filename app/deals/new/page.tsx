@@ -49,7 +49,12 @@ export default async function NewDeal({ searchParams }: { searchParams: Promise<
           <span>I have these tickets in my account right now and will send them through the ticket app.</span>
         </label>
 
-        {error && <div className="notice bad">Fill in the event, the ticket app, a price between $1 and $5,000, and tick the box.</div>}
+        {error === "invite" && (
+          <div className="notice bad">Selling is invite-only during the beta. Ask Tom to add your email, then try again.</div>
+        )}
+        {error && error !== "invite" && (
+          <div className="notice bad">Fill in the event, the ticket app, a price between $1 and $5,000, and tick the box.</div>
+        )}
         <button className="btn block" type="submit">Create deal link</button>
         <p className="muted small">Beta: payments use Stripe test cards. No real money moves.</p>
       </form>

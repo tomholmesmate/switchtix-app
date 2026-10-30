@@ -1,8 +1,8 @@
 {
   "name": "SwitchTix",
   "short_name": "SwitchTix",
-  "description": "Safe deals. Forever stubs.",
-  "start_url": "/collection",
+  "description": "Safe ticket deals between people.",
+  "start_url": "/deals",
   "display": "standalone",
   "background_color": "#120d26",
   "theme_color": "#120d26",
