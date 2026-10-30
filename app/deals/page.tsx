@@ -14,14 +14,7 @@ export default async function Deals() {
   return (
     <>
       <h1>Deals</h1>
-      <p className="muted">
-        Sell tickets to anyone with a deal link. The buyer’s money is held by SwitchTix until they confirm the tickets
-        arrived, so nobody has to go first on trust. You keep your full price. <strong>Beta: Stripe test cards only, no real money.</strong>
-      </p>
-      <div className="actions">
-        <Link className="btn" href="/deals/new">+ Start a deal</Link>
-        <Link className="btn secondary" href="/payouts">Payouts</Link>
-      </div>
+      <Link className="btn block" href="/deals/new">+ Sell tickets</Link>
 
       {owed.length > 0 && (
         <div className="notice">
@@ -29,9 +22,9 @@ export default async function Deals() {
         </div>
       )}
 
-      <h2>Your deals</h2>
+      <div style={{ marginTop: 20 }} />
       {deals.length === 0 ? (
-        <p className="muted">No deals yet.</p>
+        <p className="muted center">No deals yet. Sell tickets, or open a deal link someone sent you.</p>
       ) : (
         <div className="list">
           {deals.map((d) => (

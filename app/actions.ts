@@ -68,7 +68,7 @@ export async function signIn(_prev: LoginState, form: FormData): Promise<LoginSt
   redirect(dest);
 }
 
-/** "Continue with Google". Only shown when NEXT_PUBLIC_GOOGLE_SIGNIN=on (after Google is set up in Supabase). */
+/** "Continue with Google": signs in, or creates a SwitchTix account on first use. Shown once Google is on in Supabase. */
 export async function signInWithGoogle(form: FormData) {
   const dest = safeNext(String(form.get("next") || ""));
   const h = await headers();

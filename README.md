@@ -83,13 +83,17 @@ update auth.users set raw_app_meta_data = raw_app_meta_data - 'password_set' whe
 
 Problems go to the **Admin** page, where you release to the seller or refund the buyer.
 
-## Part 4b — Google sign-in (optional, free) · ~15 min
+## Part 4b — Sign up with Google (free) · ~15 min
+
+The app's main sign-in button. The first time someone taps **Continue with Google** it creates their SwitchTix account; after that it signs them in. Anyone can join this way to buy from a deal link; selling still needs an invite.
 
 1. Go to **console.cloud.google.com** and create a project called `SwitchTix`.
-2. **APIs & Services → OAuth consent screen:** choose *External*, app name `SwitchTix`, your email as support and developer contact. Save.
+2. **Google Auth Platform → Branding / OAuth consent screen:** choose *External*, app name `SwitchTix`, your email as support and developer contact. Under **Audience**, click **Publish app** so anyone with a Google account can sign in (basic email and profile need no Google review). Save.
 3. **APIs & Services → Credentials → Create credentials → OAuth client ID:** type *Web application*. Under **Authorized redirect URIs** add `https://YOUR-PROJECT.supabase.co/auth/v1/callback` (your Supabase Project URL + `/auth/v1/callback`). Create, then copy the **Client ID** and **Client secret**.
 4. **Supabase → Authentication → Sign In / Providers → Google:** turn it on and paste the Client ID and secret. Save.
-5. **Vercel → Environment Variables:** add `NEXT_PUBLIC_GOOGLE_SIGNIN` = `on`, then redeploy. The **Continue with Google** button appears on the sign-in page.
+5. Also in **Supabase → Authentication → URL Configuration**, make sure `https://switchtix-app.vercel.app/**` is listed under Redirect URLs.
+
+That's it: the app checks Supabase and shows **Continue with Google** within a minute, with no redeploy. (To hide it again, set `NEXT_PUBLIC_GOOGLE_SIGNIN` = `off` in Vercel.)
 
 ## Part 4c — Email updates at each step (optional, free) · ~5 min
 

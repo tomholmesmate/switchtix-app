@@ -36,6 +36,24 @@ export async function currentUser() {
   return data.user;
 }
 
+/**
+ * True once Google is switched on in Supabase (Authentication → Sign In / Providers → Google).
+ * Checked automatically, so the Google button appears without any app setting. Set
+ * NEXT_PUBLIC_GOOGLE_SIGNIN=off to hide it anyway, or =on to force it on.
+ */
+export async function googleEnabled() {
+  if (process.env.NEXT_PUBLIC_GOOGLE_SIGNIN === "off") return false;
+  if (process.env.NEXT_PUBLIC_GOOGLE_SIGNIN === "on") return true;
+  try {
+    const res = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: anonKey }, next: { revalidate: 60 } });
+    if (!res.ok) return false;
+    const settings = (await res.json()) as { external?: { google?: boolean } };
+    return Boolean(settings.external?.google);
+  } catch {
+    return false;
+  }
+}
+
 export function siteUrl() {
   // NEXT_PUBLIC_SITE_URL wins if set; otherwise use the production address Vercel provides automatically.
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;

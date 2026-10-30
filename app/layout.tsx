@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SwitchTix",
-  description: "Buy and sell tickets with anyone, without getting scammed.",
+  description: "Safe ticket deals between people.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "SwitchTix", statusBarStyle: "black-translucent" },
   icons: { icon: "/icon-192.png", apple: "/icon-192.png" },
@@ -23,29 +23,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const user = await currentUser();
   return (
     <html lang="en">
-      <body>
+      <body className={user ? "app" : "guest"}>
         <header className="topbar">
           <Link href={user ? "/deals" : "/"} className="brand">
             <img src="/logo.svg" alt="SwitchTix" />
           </Link>
-          {!user && (
-            <nav>
-              <Link href="/signin">Sign in</Link>
-            </nav>
-          )}
           {user && (
-            <nav>
-              <Link href="/deals">Deals</Link>
-              <Link href="/payouts">Payouts</Link>
-              {isAdmin(user.email) && <Link href="/admin">Admin</Link>}
-              <form action="/auth/signout" method="post">
-                <button className="linkish" type="submit">Sign out</button>
-              </form>
-            </nav>
+            <form action="/auth/signout" method="post">
+              <button className="linkish" type="submit">Sign out</button>
+            </form>
           )}
         </header>
         <main>{children}</main>
-        <footer className="foot">SwitchTix beta · Stripe test mode, no real money moves</footer>
+        {user && (
+          <nav className="tabbar">
+            <Link href="/deals"><span aria-hidden="true">🎟️</span>Deals</Link>
+            <Link href="/deals/new"><span aria-hidden="true">＋</span>Sell</Link>
+            <Link href="/payouts"><span aria-hidden="true">💸</span>Payouts</Link>
+            {isAdmin(user.email) && <Link href="/admin"><span aria-hidden="true">🛡️</span>Admin</Link>}
+          </nav>
+        )}
       </body>
     </html>
   );

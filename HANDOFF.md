@@ -26,7 +26,8 @@ The product is **escrow first**: a fair, transparent way for strangers to trade 
 | --- | --- | --- |
 | Fee model | Buyer pays Stripe's exact costs as an itemized "payment processing" line; seller keeps 100%; SwitchTix keeps $0 | Break even on deals, fully transparent, monetize other ways later |
 | Product order | Escrow first; memory stubs are phase 2 | For the average person, a fair money transfer is the hook |
-| Sign-in | Email + password now; "Continue with Google" built, switched on by one setting | Sign-in emails hit Supabase's free limits; Google feels natural |
+| App, not website | Opens straight to a sign-in screen or your deals; bottom tab bar (Deals, Sell, Payouts); the marketing story lives on switchtix.io later | It's an app; keep it simple |
+| Sign-in | "Continue with Google" is the main button and creates the account on first use; email + password is the fallback | Passwords feel janky; Google feels natural |
 | Who can join | Anyone opening a deal link can buy; only invited emails can sell | Grandma gets the link and just pays; you control who sells |
 | Escrow rules | Release on buyer "I got the tickets", or automatically 48 h after "sent" unless disputed | Fair to both sides |
 | Tickets allowed | Only issuer-app transfers (Ticketmaster, AXS, SeatGeek); no PDFs or screenshots | Copyable tickets can't be protected by escrow |
@@ -38,8 +39,8 @@ The product is **escrow first**: a fair, transparent way for strangers to trade 
 
 ## What's built
 
-- **Public homepage**: the scam problem, three steps, a "why not Venmo" comparison, the $0-keeps price example.
-- **Sign-in page**: email + password (no emails sent) and a ready-to-enable Google button.
+- **App shell**: opens to a one-screen sign-in (or straight to your deals), logo bar on top, tab bar at the bottom (Deals, Sell, Payouts, Admin for you).
+- **Sign up with Google**: one tap creates a SwitchTix account; email + password tucked under "Use email instead".
 - **Deal links**: seller enters event, date, venue, seats, ticket app and price, confirms they hold the tickets, shares the link.
 - **Escrow checkout**: buyer pays ticket + payment processing through Stripe; money is held until release.
 - **Itemized price** on every deal: card processing, payout cost, Stripe's monthly seller fee, "SwitchTix keeps $0.00".
@@ -118,7 +119,7 @@ Vercel environment variables:
 | STRIPE_SECRET_KEY | Stripe → Developers → API keys (sk_test_…) | Set |
 | ADMIN_EMAILS | Your email | Set |
 | CRON_SECRET | Any long random text | Set |
-| NEXT_PUBLIC_GOOGLE_SIGNIN | `on` once Google is set up in Supabase | Not yet |
+| NEXT_PUBLIC_GOOGLE_SIGNIN | Not needed: Google appears automatically once on in Supabase (`off` hides it) | Not needed |
 | SMTP_USER, SMTP_PASS, SMTP_FROM | Gmail address + app password | Not yet |
 | MINTER_PRIVATE_KEY, STUB_CONTRACT_ADDRESS | Phase 2 minting | Not yet |
 | NEXT_PUBLIC_SITE_URL | Only for a custom domain | Not needed |
@@ -151,7 +152,7 @@ Finish the beta (free):
 - [ ] Finish a seller's Payouts setup with the test details shown on that page; confirm the transfer in Stripe → Connect
 - [ ] Run one dispute end to end and resolve it on Admin
 - [ ] Turn on email updates (README Part 4c, ~5 min)
-- [ ] Turn on Google sign-in (README Part 4b, ~15 min)
+- [ ] Turn on Google in Google Cloud + Supabase (README Part 4b, ~15 min); the button then appears by itself
 - [ ] Invite 10–15 sellers: concert friends, a season-ticket holder, sports parents
 - [ ] Run for two weeks; record repeat deals, buyers who later sell, where people got stuck
 
