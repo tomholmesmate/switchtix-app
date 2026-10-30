@@ -19,7 +19,11 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
       {error === "link" && <div className="notice bad">That sign-in didn’t finish. Please try again.</div>}
       {error === "google" && <div className="notice bad">Google sign-in isn’t available right now. Use your email instead.</div>}
       <LoginForm next={safe} google={await googleEnabled()} />
-      <p className="muted small launch-foot">Beta · test mode, no real money moves</p>
+      <p className="muted small launch-foot">
+        Beta · test mode, no real money moves
+        <br />
+        <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>
+      </p>
     </div>
   );
 }

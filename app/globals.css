@@ -161,3 +161,10 @@ body.app main { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .btn.google { background: #fff; color: #1f1f1f; border: 1px solid #dadce0; margin-top: 0; padding: 15px 20px; font-size: 1.02rem; }
 .or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.8rem; margin: 16px 0 0; }
 .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* Privacy and terms */
+.legal { max-width: 640px; }
+.legal h2 { font-size: 1.05rem; margin-top: 24px; }
+.legal ul { padding-left: 20px; line-height: 1.5; }
+.legal li { margin-bottom: 6px; }
+.launch-foot a { color: var(--muted); text-decoration: underline; }
