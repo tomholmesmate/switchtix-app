@@ -31,10 +31,8 @@ Everything runs on free tiers. Nothing needs to be installed on your PC.
    | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Project URL |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon / publishable key |
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role / secret key |
-   | `NEXT_PUBLIC_SITE_URL` | leave blank for now |
 
-3. Click **Deploy**. When it finishes, copy your live address (something like `https://switchtix-abc.vercel.app`).
-4. Go back to **Settings → Environment Variables**, set `NEXT_PUBLIC_SITE_URL` to that address (no slash at the end), then **Deployments → ⋯ → Redeploy**.
+3. Click **Deploy**. When it finishes, copy your live address (something like `https://switchtix-abc.vercel.app`). The app detects this address automatically; set `NEXT_PUBLIC_SITE_URL` only if you later use a custom domain.
 
 ## Part 3 — Connect sign-in emails to your site · ~2 min
 

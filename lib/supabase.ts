@@ -37,7 +37,10 @@ export async function currentUser() {
 }
 
 export function siteUrl() {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  // NEXT_PUBLIC_SITE_URL wins if set; otherwise use the production address Vercel provides automatically.
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const fallback = vercel ? `https://${vercel}` : "http://localhost:3000";
+  return (process.env.NEXT_PUBLIC_SITE_URL || fallback).replace(/\/$/, "");
 }
 
 export function stubImageUrl(path: string | null) {
