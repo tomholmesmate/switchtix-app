@@ -55,3 +55,8 @@ create policy "Users read their payout account" on public.payout_accounts
 insert into storage.buckets (id, name, public)
 values ('evidence', 'evidence', false)
 on conflict (id) do nothing;
+
+-- 5. Transparent payment processing (added later; safe to run again).
+alter table public.deals
+  add column if not exists buyer_fee_cents integer not null default 0,
+  add column if not exists fee_breakdown jsonb;

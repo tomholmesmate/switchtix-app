@@ -40,6 +40,8 @@ export type Deal = {
   seats: string | null;
   ticket_platform: string | null;
   price_cents: number;
+  buyer_fee_cents: number;
+  fee_breakdown: FeeBreakdown | null;
   status: DealStatus;
   checkout_session_id: string | null;
   payment_intent_id: string | null;
@@ -78,9 +80,36 @@ export const STATUS_LABEL: Record<DealStatus, string> = {
   cancelled: "Cancelled",
 };
 
-/** The fee SwitchTix plans to charge after the beta: 6% split between buyer and seller, $4.99 minimum. */
-export function plannedFeeEachSide(priceCents: number) {
-  return Math.ceil(Math.max(499, Math.round(priceCents * 0.06)) / 2);
+/**
+ * Stripe's published US prices that the buyer's "payment processing" line covers.
+ * SwitchTix adds nothing on top: the line is exactly what Stripe charges for the deal.
+ */
+export const STRIPE_COSTS = {
+  cardPercent: 0.029, // card, Apple Pay, Google Pay, Link
+  cardFixedCents: 30,
+  payoutPercent: 0.0025, // sending the seller's money (Stripe Connect)
+  payoutFixedCents: 25,
+  sellerMonthlyCents: 200, // Stripe Connect, the first time a seller is paid in a calendar month
+};
+
+export type FeeBreakdown = {
+  cardCents: number;
+  payoutCents: number;
+  sellerMonthlyCents: number;
+  totalCents: number;
+};
+
+/**
+ * The buyer's payment-processing fee for a ticket price, so SwitchTix nets exactly $0.
+ * The card fee is charged on the total (ticket + this fee), hence the division.
+ */
+export function processingFee(priceCents: number, sellerPaidThisMonth: boolean): FeeBreakdown {
+  const c = STRIPE_COSTS;
+  const payoutCents = Math.ceil(priceCents * c.payoutPercent + c.payoutFixedCents);
+  const sellerMonthlyCents = sellerPaidThisMonth ? 0 : c.sellerMonthlyCents;
+  const otherCents = payoutCents + sellerMonthlyCents;
+  const totalCents = Math.ceil((priceCents * c.cardPercent + c.cardFixedCents + otherCents) / (1 - c.cardPercent));
+  return { cardCents: totalCents - otherCents, payoutCents, sellerMonthlyCents, totalCents };
 }
 
 export function displayName(email: string | undefined | null) {

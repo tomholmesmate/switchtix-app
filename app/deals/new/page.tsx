@@ -8,7 +8,8 @@ export default async function NewDeal({ searchParams }: { searchParams: Promise<
       <h1>Start a deal</h1>
       <p className="muted">
         Selling tickets you already have? Create a deal link and send it to your buyer. Their money waits safely with
-        SwitchTix until they confirm the tickets arrived.
+        SwitchTix until they confirm the tickets arrived. You keep 100% of your price; the buyer pays Stripe’s payment
+        processing, and SwitchTix keeps nothing.
       </p>
       <form action={createDeal} className="panel">
         <label htmlFor="event_name">Event *</label>
@@ -40,7 +41,7 @@ export default async function NewDeal({ searchParams }: { searchParams: Promise<
           copied, so they aren’t allowed.
         </p>
 
-        <label htmlFor="price">Total price (USD) *</label>
+        <label htmlFor="price">Your price for the tickets (USD) *</label>
         <input id="price" name="price" inputMode="decimal" required placeholder="150" />
 
         <label className="check">

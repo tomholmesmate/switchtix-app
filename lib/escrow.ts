@@ -2,7 +2,7 @@
 import type Stripe from "stripe";
 import { adminClient } from "./supabase";
 import { stripe, stripeEnabled } from "./stripe";
-import type { Deal, DealStatus } from "./types";
+import { processingFee, type Deal, type DealStatus, type FeeBreakdown } from "./types";
 
 const db = () => adminClient();
 
@@ -169,4 +169,23 @@ export function isAdmin(email: string | undefined | null) {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
   return admins.includes(email.toLowerCase());
+}
+
+/** True if this seller already received a payout this calendar month (Stripe charges its $2 seller fee once a month). */
+export async function sellerPaidThisMonth(sellerId: string) {
+  const start = new Date();
+  start.setUTCDate(1);
+  start.setUTCHours(0, 0, 0, 0);
+  const { count } = await db()
+    .from("deals")
+    .select("id", { count: "exact", head: true })
+    .eq("seller_id", sellerId)
+    .eq("payout_status", "transferred")
+    .gte("released_at", start.toISOString());
+  return (count ?? 0) > 0;
+}
+
+/** What the buyer pays for payment processing on this deal right now. */
+export async function feeForDeal(deal: Deal): Promise<FeeBreakdown> {
+  return processingFee(deal.price_cents, await sellerPaidThisMonth(deal.seller_id));
 }

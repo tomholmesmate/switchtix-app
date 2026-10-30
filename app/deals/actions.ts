@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getDeal, isAdmin, refreshDeal, refund, release } from "@/lib/escrow";
+import { feeForDeal, getDeal, isAdmin, refreshDeal, refund, release } from "@/lib/escrow";
 import { stripe, stripeEnabled } from "@/lib/stripe";
 import { adminClient, currentUser, siteUrl } from "@/lib/supabase";
 import { AUTO_RELEASE_HOURS, TICKET_PLATFORMS, displayName, type Deal } from "@/lib/types";
@@ -97,6 +97,9 @@ export async function startPayment(form: FormData) {
     back(id, "error=taken");
   }
 
+  const fee = await feeForDeal(deal);
+  await db.from("deals").update({ buyer_fee_cents: fee.totalCents, fee_breakdown: fee }).eq("id", id);
+
   const base = await baseUrl();
   const session = await stripe().checkout.sessions.create({
     mode: "payment",
@@ -109,12 +112,23 @@ export async function startPayment(form: FormData) {
           unit_amount: deal.price_cents,
           product_data: {
             name: `${deal.event_name} — tickets from ${deal.seller_name ?? "a friend"}`,
-            description: "Held in SwitchTix escrow until you confirm the tickets arrived.",
+            description: "Held by SwitchTix until you confirm the tickets arrived. The seller receives this full amount.",
+          },
+        },
+      },
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: fee.totalCents,
+          product_data: {
+            name: "Payment processing",
+            description: "Exactly what Stripe charges to take your payment and pay the seller. SwitchTix keeps $0.",
           },
         },
       },
     ],
-    payment_intent_data: { transfer_group: deal.id, metadata: { deal_id: deal.id } },
+    payment_intent_data: { transfer_group: deal.id, metadata: { deal_id: deal.id, processing_fee_cents: String(fee.totalCents) } },
     metadata: { deal_id: deal.id },
     expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
     success_url: `${base}/d/${deal.id}?paid=1`,

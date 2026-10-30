@@ -9,7 +9,7 @@ import {
   startPayment,
 } from "@/app/deals/actions";
 import ShareButton from "@/app/s/[id]/ShareButton";
-import { getDeal, refreshDeal } from "@/lib/escrow";
+import { feeForDeal, getDeal, refreshDeal } from "@/lib/escrow";
 import { currentUser } from "@/lib/supabase";
 import {
   AUTO_RELEASE_HOURS,
@@ -17,8 +17,8 @@ import {
   formatDate,
   formatDateTime,
   money,
-  plannedFeeEachSide,
   type Deal,
+  type FeeBreakdown,
 } from "@/lib/types";
 
 const ERRORS: Record<string, string> = {
@@ -92,7 +92,10 @@ export default async function DealPage({
     `${isBuyer ? "You confirm" : `${buyer} confirms`} they arrived (or ${AUTO_RELEASE_HOURS}h pass with no problem reported)`,
     `${isSeller ? "You get" : `${seller} gets`} paid`,
   ];
-  const fee = plannedFeeEachSide(deal.price_cents);
+  // Payment processing: stored once the buyer starts paying, otherwise worked out live.
+  const fee: FeeBreakdown =
+    deal.fee_breakdown && deal.buyer_fee_cents > 0 && deal.status !== "open" ? deal.fee_breakdown : await feeForDeal(deal);
+  const total = deal.price_cents + fee.totalCents;
 
   return (
     <>
@@ -123,10 +126,7 @@ export default async function DealPage({
             {STATUS_LABEL[deal.status]}
           </span>
         </div>
-        <p style={{ fontSize: "1.6rem", fontWeight: 800, margin: "14px 0 0" }}>{money(deal.price_cents)}</p>
-        <p className="muted small" style={{ margin: "4px 0 0" }}>
-          SwitchTix fee: free during the beta (normally about {money(fee)} each side).
-        </p>
+        <PriceBox deal={deal} fee={fee} isSeller={isSeller} />
 
         <EscrowBox deal={deal} isBuyer={isBuyer} isSeller={isSeller} app={app} buyer={buyer} seller={seller} />
 
@@ -145,7 +145,7 @@ export default async function DealPage({
           {/* Waiting for a buyer */}
           {deal.status === "open" && isSeller && <ShareButton title={`Ticket deal: ${deal.event_name}`} />}
           {deal.status === "open" && !isSeller && user && (
-            <Action action={startPayment} id={id} label={`Pay ${money(deal.price_cents)} into escrow`} />
+            <Action action={startPayment} id={id} label={`Pay ${money(total)} safely`} />
           )}
           {deal.status === "open" && !user && <Link className="btn" href={`/?next=/d/${id}`}>Sign in to buy</Link>}
 
@@ -307,4 +307,34 @@ function EscrowBox({
   }
 
   return <div className={`notice ${tone}`}>{body}</div>;
+}
+
+function PriceBox({ deal, fee, isSeller }: { deal: Deal; fee: FeeBreakdown; isSeller: boolean }) {
+  const total = deal.price_cents + fee.totalCents;
+  if (isSeller) {
+    return (
+      <div className="pricebox">
+        <div className="price-row big"><span>You receive</span><span className="num">{money(deal.price_cents)}</span></div>
+        <p className="muted small">The full price. The buyer pays the payment processing on top, and SwitchTix keeps nothing.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="pricebox">
+      <div className="price-row"><span>Tickets</span><span className="num">{money(deal.price_cents)}</span></div>
+      <div className="price-row"><span>Payment processing</span><span className="num">{money(fee.totalCents)}</span></div>
+      <details className="price-detail">
+        <summary>Where the {money(fee.totalCents)} goes</summary>
+        <div className="price-row"><span>Card or Apple Pay processing (Stripe, 2.9% + 30¢)</span><span className="num">{money(fee.cardCents)}</span></div>
+        <div className="price-row"><span>Sending the seller their money (Stripe, 0.25% + 25¢)</span><span className="num">{money(fee.payoutCents)}</span></div>
+        <div className="price-row">
+          <span>{fee.sellerMonthlyCents ? "Stripe’s monthly fee for paying this seller" : "Stripe’s monthly seller fee (already covered this month)"}</span>
+          <span className="num">{money(fee.sellerMonthlyCents)}</span>
+        </div>
+        <div className="price-row keep"><span>SwitchTix keeps</span><span className="num">$0.00</span></div>
+      </details>
+      <div className="price-row big"><span>Total</span><span className="num">{money(total)}</span></div>
+      <p className="muted small">The seller receives the full {money(deal.price_cents)}.</p>
+    </div>
+  );
 }

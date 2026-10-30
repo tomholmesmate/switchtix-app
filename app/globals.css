@@ -124,3 +124,13 @@ select {
 .check { display: flex; gap: 10px; align-items: flex-start; color: var(--text); font-size: 0.92rem; margin-top: 16px; }
 .check input { width: 20px; height: 20px; flex: none; margin-top: 2px; }
 details summary { list-style: revert; }
+
+.pricebox { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); display: grid; gap: 6px; }
+.price-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.95rem; }
+.price-row .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.price-row.big { font-weight: 800; font-size: 1.25rem; padding-top: 6px; border-top: 1px solid var(--line); }
+.price-detail { font-size: 0.85rem; color: var(--muted); display: grid; gap: 4px; }
+.price-detail summary { cursor: pointer; color: var(--accent-2); margin-bottom: 4px; }
+.price-detail .price-row { font-size: 0.85rem; padding-left: 10px; }
+.price-row.keep { color: var(--good); font-weight: 700; }
+.pricebox p { margin: 0; }
