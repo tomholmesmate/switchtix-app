@@ -34,16 +34,11 @@ Everything runs on free tiers. Nothing needs to be installed on your PC.
 
 3. Click **Deploy**. When it finishes, copy your live address (something like `https://switchtix-abc.vercel.app`). The app detects this address automatically; set `NEXT_PUBLIC_SITE_URL` only if you later use a custom domain.
 
-## Part 3 — Connect sign-in emails to your site · ~2 min
+## Part 3 — Try it, then invite people
 
-In Supabase, open **Authentication → URL Configuration**:
+Sign-in uses a password, so the app never sends email and there are no email limits.
 
-- **Site URL:** your Vercel address
-- **Redirect URLs:** add `https://YOUR-ADDRESS.vercel.app/auth/callback`
-
-## Part 4 — Try it, then invite people
-
-1. Open your Vercel address on your phone, enter your email and tap the link that arrives. Open it in the same browser you requested it from.
+1. Open your Vercel address on your phone, enter your email (it must be on the invite list) and **pick a password**. The first password you enter becomes yours.
 2. Mint a stub and start a deal to make sure everything works.
 3. To invite someone, run this in the Supabase SQL Editor:
 
@@ -51,11 +46,16 @@ In Supabase, open **Authentication → URL Configuration**:
    insert into public.invites (email) values ('friend@example.com') on conflict do nothing;
    ```
 
-4. Send them the link and tell them to tap **Share → Add to Home Screen** (iPhone) or **⋮ → Add to Home screen** (Android).
+4. Send them the link. They enter their email and choose a password the first time. Tell them to tap **Share → Add to Home Screen** (iPhone) or **⋮ → Add to Home screen** (Android).
+
+**Someone forgot their password?** Run this in the SQL Editor (with their email), and the next password they enter becomes their new one:
+
+```sql
+update auth.users set raw_app_meta_data = raw_app_meta_data - 'password_set' where email = 'friend@example.com';
+```
 
 **Good to know about the free tiers**
 
-- Supabase's built-in email sender only allows a few sign-in emails per hour. That's fine for trickling in friends; if people hit "too many emails", wait a bit. For more volume later, Supabase lets you plug in a free SMTP service such as Resend.
 - Free Supabase projects pause after about a week with no activity. If the app stops loading, open Supabase and click **Restore project**.
 - Vercel's free Hobby plan is for non-commercial use, which suits a private beta.
 

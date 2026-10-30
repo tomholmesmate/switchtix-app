@@ -1,35 +1,71 @@
 "use server";
 
-import { headers } from "next/headers";
-import { adminClient, siteUrl, userClient } from "@/lib/supabase";
+import { redirect } from "next/navigation";
+import { adminClient, userClient } from "@/lib/supabase";
 
-export type LoginState = { status: "idle" | "sent" | "error"; message?: string };
+export type LoginState = { status: "idle" | "error"; message?: string };
 
-export async function sendSignInLink(_prev: LoginState, form: FormData): Promise<LoginState> {
+/**
+ * Invite-only sign-in with a password, so no emails are ever sent.
+ * The first time an invited person signs in, the password they type becomes their password.
+ */
+export async function signIn(_prev: LoginState, form: FormData): Promise<LoginState> {
   const email = String(form.get("email") || "").trim().toLowerCase();
+  const password = String(form.get("password") || "");
   const next = String(form.get("next") || "");
-  if (!email.includes("@")) return { status: "error", message: "Enter a valid email." };
+  const dest = next.startsWith("/") ? next : "/collection";
 
-  // Invite-only: the email must be on the invite list.
-  const { data: invite, error } = await adminClient().from("invites").select("email").eq("email", email).maybeSingle();
+  if (!email.includes("@")) return { status: "error", message: "Enter a valid email." };
+  if (password.length < 6) return { status: "error", message: "Passwords need at least 6 characters." };
+
+  const admin = adminClient();
+  const { data: invite, error } = await admin.from("invites").select("email").eq("email", email).maybeSingle();
   if (error) return { status: "error", message: "Something went wrong. Try again in a minute." };
   if (!invite) return { status: "error", message: "That email isn’t on the invite list yet. Ask Tom to add you." };
 
-  // Send people back to the address they're actually using (falls back to the configured site URL).
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const base = host && !process.env.NEXT_PUBLIC_SITE_URL ? `${proto}://${host}` : siteUrl();
-  const redirectTo = `${base}/auth/callback${next.startsWith("/") ? `?next=${encodeURIComponent(next)}` : ""}`;
   const supabase = await userClient();
-  const { error: sendError } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
-  if (sendError) {
-    return {
-      status: "error",
-      message: sendError.message.toLowerCase().includes("rate")
-        ? "Too many sign-in emails were sent recently. Wait a bit and try again."
-        : "Couldn’t send the email. Try again.",
-    };
+
+  // Returning user with the right password.
+  const first = await supabase.auth.signInWithPassword({ email, password });
+  if (!first.error) redirect(dest);
+
+  // First visit: create the account with this password (no confirmation email).
+  const created = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    app_metadata: { password_set: true },
+  });
+
+  if (created.error) {
+    // The account already exists. If it never had a password set (for example it came from an
+    // earlier email-link attempt), set this one now; otherwise the password was wrong.
+    const existing = await findUserByEmail(email);
+    if (!existing) return { status: "error", message: "Couldn’t sign you in. Try again." };
+    if (existing.app_metadata?.password_set) {
+      return { status: "error", message: "That password doesn’t match. Try again, or ask Tom to reset it." };
+    }
+    const updated = await admin.auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+      app_metadata: { ...existing.app_metadata, password_set: true },
+    });
+    if (updated.error) return { status: "error", message: "Couldn’t set your password. Try again." };
   }
-  return { status: "sent" };
+
+  const second = await supabase.auth.signInWithPassword({ email, password });
+  if (second.error) return { status: "error", message: "Couldn’t sign you in. Try again." };
+  redirect(dest);
+}
+
+async function findUserByEmail(email: string) {
+  const admin = adminClient();
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error || !data) return null;
+    const match = data.users.find((u) => u.email?.toLowerCase() === email);
+    if (match) return match;
+    if (data.users.length < 200) return null;
+  }
+  return null;
 }
