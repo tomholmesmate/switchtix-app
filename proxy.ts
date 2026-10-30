@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED = ["/collection", "/mint", "/deals"];
+const PROTECTED = ["/collection", "/mint", "/deals", "/payouts", "/admin"];
 
 /** Keeps the sign-in session fresh and sends signed-out visitors to the home page. */
 export async function proxy(request: NextRequest) {
@@ -36,5 +36,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon-.*\\.png|logo.svg|manifest.webmanifest|api/metadata).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon-.*\\.png|logo.svg|manifest.webmanifest|api/metadata|api/cron).*)"],
 };

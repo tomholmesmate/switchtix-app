@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { isAdmin } from "@/lib/escrow";
 import { currentUser } from "@/lib/supabase";
 import "./globals.css";
 
@@ -31,6 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <nav>
               <Link href="/collection">Stubs</Link>
               <Link href="/deals">Deals</Link>
+              {isAdmin(user.email) && <Link href="/admin">Admin</Link>}
               <form action="/auth/signout" method="post">
                 <button className="linkish" type="submit">Sign out</button>
               </form>
@@ -38,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           )}
         </header>
         <main>{children}</main>
-        <footer className="foot">Beta for friends and family · test network only, nothing here has cash value</footer>
+        <footer className="foot">Beta for friends and family · Stripe test mode and test network only, no real money</footer>
       </body>
     </html>
   );

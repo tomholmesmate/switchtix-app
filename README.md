@@ -5,7 +5,7 @@
 An invite-only web app where friends:
 
 - **Mint stubs** — upload a photo of a ticket stub, add the details and a note, and get a keepsake card they can share. Each stub is minted on **Base Sepolia**, a free blockchain test network.
-- **Try deal links** — sell a ticket to a friend through a simulated escrow flow (no real money moves).
+- **Sell tickets through escrow** — the buyer pays with a Stripe **test** card, SwitchTix holds the money, and it's released to the seller only when the buyer confirms the tickets arrived (or 48 hours pass with no problem reported). No real money moves in the beta.
 - **Install it** — open the site on a phone and choose *Add to Home Screen*.
 
 Everything runs on free tiers. Nothing needs to be installed on your PC.
@@ -59,6 +59,30 @@ update auth.users set raw_app_meta_data = raw_app_meta_data - 'password_set' whe
 - Free Supabase projects pause after about a week with no activity. If the app stops loading, open Supabase and click **Restore project**.
 - Vercel's free Hobby plan is for non-commercial use, which suits a private beta.
 
+## Part 4 — Turn on escrow (Stripe test mode, free) · ~15 min
+
+1. **Database:** in Supabase **SQL Editor → New query**, paste all of [`supabase/escrow.sql`](supabase/escrow.sql) and click **Run**.
+2. **Stripe account:** sign up free at stripe.com. Stay in **test mode / sandbox** (no business details needed).
+3. **Turn on Connect** (this is what lets sellers receive payouts): in the Stripe dashboard open **Connect** and click **Get started**. If asked, choose a *platform or marketplace* where sellers are paid out.
+4. **Copy the test secret key:** **Developers → API keys** → *Secret key* (starts with `sk_test_`). The app refuses live keys, so no real money can move.
+5. **In Vercel → Settings → Environment Variables**, add, then **Deployments → ⋯ → Redeploy**:
+
+   | Name | Value |
+   |---|---|
+   | `STRIPE_SECRET_KEY` | the `sk_test_…` key |
+   | `ADMIN_EMAILS` | your email (comma-separate more) — unlocks the **Admin** page for disputes |
+   | `CRON_SECRET` | any long random text — protects the daily auto-release job |
+
+**How a deal works**
+
+1. Seller creates a deal link (must send through Ticketmaster, AXS or SeatGeek transfer — no PDFs).
+2. Buyer pays into escrow with a test card: `4242 4242 4242 4242`, any future date, any CVC/ZIP.
+3. Seller sends the tickets in the ticket app and taps **I've sent the tickets**.
+4. Buyer taps **I got the tickets**, or the money releases automatically 48 hours later unless they report a problem.
+5. Seller sets up payouts once (Payouts page, using Stripe's test details shown there) and the money is transferred.
+
+Problems go to the **Admin** page, where you release to the seller or refund the buyer.
+
 ## Part 5 — Turn on minting (optional, free) · ~20 min
 
 Until this is done, stubs save normally and show "mint coming soon".
@@ -93,7 +117,10 @@ New stubs now mint automatically, and each card links to its transaction on sepo
 | Minting | viem → `SwitchTixStubs` contract on Base Sepolia (`lib/chain.ts`, `lib/mint.ts`) |
 | Collectible metadata | `/api/metadata/[id]` |
 | Shareable keepsake | `/s/[id]` |
-| Deal link | `/d/[id]` |
+| Deal link and escrow | `/d/[id]`, `lib/escrow.ts`, `app/deals/actions.ts` |
+| Seller payouts | `/payouts` (Stripe Connect Express, test mode) |
+| Disputes | `/admin` |
+| Daily auto-release | `/api/cron/release` + `vercel.json` |
 | Look and feel | `app/globals.css` — swap the colors at the top for the original SwitchTix brand |
 
 To run it on your own PC later: install Node.js, copy `.env.example` to `.env.local`, fill it in, then run `npm install` and `npm run dev`.
