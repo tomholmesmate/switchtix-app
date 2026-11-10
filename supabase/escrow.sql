@@ -60,3 +60,10 @@ on conflict (id) do nothing;
 alter table public.deals
   add column if not exists buyer_fee_cents integer not null default 0,
   add column if not exists fee_breakdown jsonb;
+
+-- 6. "Seller gets paid when you get in" (Nov 2026; safe to run again).
+--    Money releases 2 hours after the event starts unless the buyer reports a problem.
+alter table public.deals
+  add column if not exists event_starts_at timestamptz,
+  add column if not exists event_time_zone text,
+  add column if not exists transfer_accepted_at timestamptz;

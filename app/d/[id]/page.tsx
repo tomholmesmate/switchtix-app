@@ -12,8 +12,10 @@ import ShareButton from "@/app/s/[id]/ShareButton";
 import { feeForDeal, getDeal, refreshDeal } from "@/lib/escrow";
 import { currentUser } from "@/lib/supabase";
 import {
-  AUTO_RELEASE_HOURS,
+  DOOR_WINDOW_HOURS,
   STATUS_LABEL,
+  eventStarted,
+  formatEventStart,
   formatDate,
   formatDateTime,
   money,
@@ -45,6 +47,7 @@ function stepIndex(d: Deal) {
     case "paid":
       return 1;
     case "sent":
+      return d.transfer_accepted_at ? 3 : 2;
     case "disputed":
       return 2;
     case "released":
@@ -59,7 +62,7 @@ export default async function DealPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ new?: string; paid?: string; released?: string; error?: string; checkout?: string }>;
+  searchParams: Promise<{ new?: string; paid?: string; released?: string; accepted?: string; error?: string; checkout?: string }>;
 }) {
   const { id } = await params;
   const q = await searchParams;
@@ -89,9 +92,11 @@ export default async function DealPage({
     "Deal created",
     `${isBuyer ? "You pay" : `${buyer} pays`} · SwitchTix holds the money`,
     `${isSeller ? "You send" : `${seller} sends`} the tickets in ${app}`,
-    `${isBuyer ? "You confirm" : `${buyer} confirms`} they arrived (or ${AUTO_RELEASE_HOURS}h pass with no problem reported)`,
-    `${isSeller ? "You get" : `${seller} gets`} paid`,
+    `${isBuyer ? "You accept" : `${buyer} accepts`} the transfer in ${app}`,
+    `${isSeller ? "You get" : `${seller} gets`} paid ${DOOR_WINDOW_HOURS} hours after the event starts, unless ${isBuyer ? "you" : buyer} can’t get in`,
   ];
+  const started = eventStarted(deal);
+  const when = formatEventStart(deal) || formatDate(deal.event_date);
   // Payment processing: stored once the buyer starts paying, otherwise worked out live.
   const fee: FeeBreakdown =
     deal.fee_breakdown && deal.buyer_fee_cents > 0 && deal.status !== "open" ? deal.fee_breakdown : await feeForDeal(deal);
@@ -101,13 +106,16 @@ export default async function DealPage({
     <>
       {q.new && isSeller && <div className="notice good">Deal created. Send this link to your buyer.</div>}
       {q.paid && isBuyer && deal.status === "paid" && (
-        <div className="notice good">Payment received. SwitchTix is holding {money(deal.price_cents)} until your tickets arrive.</div>
+        <div className="notice good">Payment received. SwitchTix is holding {money(deal.price_cents)} until after the event.</div>
       )}
       {q.paid && isBuyer && deal.status === "awaiting_payment" && (
         <div className="notice">Confirming your payment… refresh in a moment.</div>
       )}
       {q.released && isBuyer && deal.status === "released" && (
         <div className="notice good">Done. The money is on its way to {seller}. Enjoy the show!</div>
+      )}
+      {q.accepted && isBuyer && deal.status === "sent" && (
+        <div className="notice good">Got it. Your money stays held until after the event, so you’re covered if anything goes wrong at the door.</div>
       )}
       {q.checkout === "cancelled" && isBuyer && <div className="notice">Payment not finished. You can try again or back out below.</div>}
       {q.error && ERRORS[q.error] && <div className="notice bad">{ERRORS[q.error]}</div>}
@@ -118,7 +126,7 @@ export default async function DealPage({
         </p>
         <h1 style={{ marginTop: 6 }}>{deal.event_name}</h1>
         <p className="muted" style={{ margin: 0 }}>
-          {[deal.venue, formatDate(deal.event_date), deal.seats].filter(Boolean).join(" · ")}
+          {[deal.venue, when, deal.seats].filter(Boolean).join(" · ")}
         </p>
         <div className="seats" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
           <span className="chip">Sent via {app}</span>
@@ -160,13 +168,12 @@ export default async function DealPage({
           {/* Paid: seller sends */}
           {deal.status === "paid" && isSeller && <Action action={markSent} id={id} label="I’ve sent the tickets" />}
 
-          {/* Sent: buyer confirms */}
-          {(deal.status === "sent" || deal.status === "paid") && isBuyer && (
-            <Action
-              action={confirmReceived}
-              id={id}
-              label={deal.status === "paid" ? "I already got the tickets · release payment" : "I got the tickets · release payment"}
-            />
+          {/* Before the event: buyer says the transfer is accepted (money stays held). After it starts: "I got in" pays the seller. */}
+          {(deal.status === "sent" || deal.status === "paid") && isBuyer && started && (
+            <Action action={confirmReceived} id={id} label={`I got in · pay ${seller} now`} />
+          )}
+          {(deal.status === "sent" || deal.status === "paid") && isBuyer && !started && !deal.transfer_accepted_at && (
+            <Action action={confirmReceived} id={id} label={`I accepted the tickets in ${app}`} />
           )}
 
           {/* Cancels */}
@@ -184,16 +191,17 @@ export default async function DealPage({
         {/* Buyer can report a problem while money is held */}
         {isBuyer && ["paid", "sent"].includes(deal.status) && (
           <details className="panel" style={{ background: "var(--surface-2)" }}>
-            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Something’s wrong</summary>
+            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Something’s wrong, or I couldn’t get in</summary>
             <p className="muted small">
-              This freezes the money and Tom reviews it. Use this if the tickets never arrived or aren’t what you paid for, and
-              add a screenshot of your {app} account if you can.
+              This freezes the money and Tom reviews it. Use it if the tickets never arrived, the transfer was cancelled, or
+              they didn’t scan at the door. Add a photo of the error screen or your {app} account if you can.
+              {deal.auto_release_at && <> Report before {formatDateTime(deal.auto_release_at)}.</>}
             </p>
             <form action={openDispute}>
               <input type="hidden" name="id" value={id} />
               <label htmlFor="reason">What happened?</label>
-              <textarea id="reason" name="reason" required maxLength={1000} placeholder="The tickets never showed up in my account…" />
-              <label htmlFor="screenshot">Screenshot (optional)</label>
+              <textarea id="reason" name="reason" required maxLength={1000} placeholder="The tickets didn’t scan at the gate…" />
+              <label htmlFor="screenshot">Photo or screenshot (optional)</label>
               <input id="screenshot" name="screenshot" type="file" accept="image/*" />
               <button className="btn block" type="submit">Report a problem</button>
             </form>
@@ -227,7 +235,7 @@ function EscrowBox({
     case "open":
       body = isSeller
         ? "Waiting for your buyer to pay. Their money will be held by SwitchTix, not sent to you yet."
-        : `Pay into escrow. ${seller} only gets the money after you confirm the tickets arrived.`;
+        : `Pay into escrow. ${seller} only gets the money once you get in: ${DOOR_WINDOW_HOURS} hours after the event starts, unless you report a problem.`;
       break;
     case "awaiting_payment":
       body = isBuyer ? "Finish paying to lock in these tickets." : `${buyer} is paying now.`;
@@ -241,23 +249,31 @@ function EscrowBox({
         </>
       ) : (
         <>
-          <strong>Your {amount} is held safely.</strong> {seller} will send the tickets to your {app} account. You’ll
-          confirm once they arrive.
+          <strong>Your {amount} is held safely until after the event.</strong> {seller} will send the tickets to your {app}{" "}
+          account. Accept the transfer there, then tap “I accepted the tickets”.
         </>
       );
       break;
     case "sent":
       tone = "good";
       body = isBuyer ? (
-        <>
-          <strong>Check your {app} app and accept the transfer.</strong> Once the tickets are in your account, tap “I got
-          the tickets”. If you don’t report a problem by {formatDateTime(deal.auto_release_at)}, the money releases to{" "}
-          {seller} automatically.
-        </>
+        deal.transfer_accepted_at ? (
+          <>
+            <strong>You’re all set. Your {amount} stays held until after the event.</strong> If the tickets don’t scan, tap
+            “Something’s wrong” before {formatDateTime(deal.auto_release_at)}. Otherwise it releases to {seller} automatically.
+          </>
+        ) : (
+          <>
+            <strong>Check your {app} app and accept the transfer,</strong> then tap “I accepted the tickets”. Your money stays
+            held until {formatDateTime(deal.auto_release_at)}, {DOOR_WINDOW_HOURS} hours after the event starts.
+          </>
+        )
       ) : (
         <>
-          <strong>{amount} is still held.</strong> It releases when {buyer} confirms, or automatically at{" "}
-          {formatDateTime(deal.auto_release_at)} if they don’t report a problem.
+          <strong>{amount} is still held.</strong>
+          {deal.transfer_accepted_at ? ` ${buyer} accepted the tickets.` : ""} It releases to you at{" "}
+          {formatDateTime(deal.auto_release_at)}, {DOOR_WINDOW_HOURS} hours after the event starts, unless {buyer} can’t get
+          in. If they tap “I got in”, it releases sooner.
         </>
       );
       break;
