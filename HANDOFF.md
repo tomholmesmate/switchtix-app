@@ -29,7 +29,8 @@ The product is **escrow first**: a fair, transparent way for strangers to trade 
 | App, not website | Opens straight to a sign-in screen or your deals; bottom tab bar (Deals, Sell, Payouts); the marketing story lives on switchtix.io later | It's an app; keep it simple |
 | Sign-in | "Continue with Google" is the main button and creates the account on first use; email + password is the fallback | Passwords feel janky; Google feels natural |
 | Who can join | Anyone opening a deal link can buy; only invited emails can sell | Grandma gets the link and just pays; you control who sells |
-| Escrow rules | Release on buyer "I got the tickets", or automatically 48 h after "sent" unless disputed | Fair to both sides |
+| Escrow rules (Nov 9) | "Seller gets paid when you get in": release 2 h after the event starts unless disputed; buyer's "I accepted the tickets" doesn't release early; "I got in" after the start releases now; 48 h after "sent" only if there's no future start time | The event proves the tickets were real; covers fakes and cancelled transfers |
+| Escrow rules (Oct 30, superseded) | Release on buyer "I got the tickets", or automatically 48 h after "sent" unless disputed | Fair to both sides |
 | Tickets allowed | Only issuer-app transfers (Ticketmaster, AXS, SeatGeek); no PDFs or screenshots | Copyable tickets can't be protected by escrow |
 | Disputes | You decide by hand on the Admin page; an accepted transfer beats "never got it" | Simple and fair at beta scale |
 | Payments | Stripe Checkout (card, Apple Pay, Google Pay, Cash App Pay, Link); sellers paid via Stripe Connect Express | Stripe holds funds under its licenses; Venmo can't do escrow |

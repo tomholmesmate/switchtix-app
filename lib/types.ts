@@ -36,6 +36,10 @@ export type Deal = {
   buyer_name: string | null;
   event_name: string;
   event_date: string | null;
+  /** When the event starts (doors or show time), as an absolute time. */
+  event_starts_at: string | null;
+  /** IANA time zone the seller entered the start time in, for display. */
+  event_time_zone: string | null;
   venue: string | null;
   seats: string | null;
   ticket_platform: string | null;
@@ -48,6 +52,8 @@ export type Deal = {
   charge_id: string | null;
   paid_at: string | null;
   sent_at: string | null;
+  /** When the buyer said the transfer is accepted in their ticket app (no money moves). */
+  transfer_accepted_at: string | null;
   auto_release_at: string | null;
   released_at: string | null;
   release_reason: string | null;
@@ -64,8 +70,78 @@ export type Deal = {
   updated_at: string;
 };
 
-/** Hours after the seller marks tickets sent before money releases automatically (unless disputed). */
-export const AUTO_RELEASE_HOURS = 48;
+/**
+ * "Seller gets paid when you get in": money releases this many hours after the event starts,
+ * unless the buyer reports a problem first. The event itself proves the tickets were real.
+ */
+export const DOOR_WINDOW_HOURS = 2;
+
+/** Used only when there is no future event start time (older deals, or tickets sent after the event began). */
+export const FALLBACK_RELEASE_HOURS = 48;
+
+/** When held money releases automatically once the seller has sent the tickets. */
+export function releaseTime(deal: Pick<Deal, "event_starts_at">, now = new Date()): Date {
+  const start = deal.event_starts_at ? new Date(deal.event_starts_at).getTime() : NaN;
+  if (Number.isFinite(start) && start > now.getTime()) return new Date(start + DOOR_WINDOW_HOURS * 3600_000);
+  return new Date(now.getTime() + FALLBACK_RELEASE_HOURS * 3600_000);
+}
+
+/** True once the event has started, so "I got in" can pay the seller straight away. */
+export function eventStarted(deal: Pick<Deal, "event_starts_at">, now = new Date()) {
+  return !deal.event_starts_at || new Date(deal.event_starts_at).getTime() <= now.getTime();
+}
+
+export const EVENT_TIME_ZONES = [
+  { id: "America/Los_Angeles", label: "Pacific" },
+  { id: "America/Denver", label: "Mountain" },
+  { id: "America/Phoenix", label: "Arizona" },
+  { id: "America/Chicago", label: "Central" },
+  { id: "America/New_York", label: "Eastern" },
+  { id: "Pacific/Honolulu", label: "Hawaii" },
+  { id: "America/Anchorage", label: "Alaska" },
+] as const;
+
+/** Turns a local date ("2026-12-05") and time ("19:30") in a time zone into an absolute ISO time. */
+export function zonedTimeToIso(date: string, time: string, timeZone: string): string | null {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const t = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!d || !t || +t[1] > 23 || +t[2] > 59 || +d[2] < 1 || +d[2] > 12 || +d[3] < 1 || +d[3] > 31) return null;
+  const wallClock = Date.UTC(+d[1], +d[2] - 1, +d[3], +t[1], +t[2]);
+  // Offset of the zone at a given instant, in ms (wall clock minus UTC).
+  const offset = (instant: number) => {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        hourCycle: "h23",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+        .formatToParts(new Date(instant))
+        .map((p) => [p.type, p.value]),
+    );
+    return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute) - instant;
+  };
+  let guess = wallClock - offset(wallClock);
+  guess = wallClock - offset(guess); // second pass settles daylight-saving edges
+  return Number.isFinite(guess) ? new Date(guess).toISOString() : null;
+}
+
+/** The event start in the event's own time zone, e.g. "Sat, Dec 5, 7:30 PM PST". */
+export function formatEventStart(deal: Pick<Deal, "event_starts_at" | "event_time_zone">) {
+  if (!deal.event_starts_at) return "";
+  return new Date(deal.event_starts_at).toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: deal.event_time_zone || "America/Los_Angeles",
+    timeZoneName: "short",
+  });
+}
 
 export const TICKET_PLATFORMS = ["Ticketmaster", "AXS", "SeatGeek", "Other ticket app transfer"] as const;
 
@@ -73,7 +149,7 @@ export const STATUS_LABEL: Record<DealStatus, string> = {
   open: "Waiting for buyer",
   awaiting_payment: "Buyer is paying",
   paid: "Paid · money held",
-  sent: "Tickets sent · money held",
+  sent: "Tickets sent · held until the event",
   disputed: "Under review",
   released: "Complete",
   refunded: "Refunded",

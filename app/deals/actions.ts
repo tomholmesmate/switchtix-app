@@ -6,7 +6,19 @@ import { feeForDeal, getDeal, isAdmin, refreshDeal, refund, release } from "@/li
 import { emailAdmins, emailUser } from "@/lib/notify";
 import { stripe, stripeEnabled } from "@/lib/stripe";
 import { adminClient, currentUser, siteUrl } from "@/lib/supabase";
-import { AUTO_RELEASE_HOURS, TICKET_PLATFORMS, displayName, formatDateTime, money, type Deal } from "@/lib/types";
+import {
+  DOOR_WINDOW_HOURS,
+  EVENT_TIME_ZONES,
+  TICKET_PLATFORMS,
+  displayName,
+  eventStarted,
+  formatDateTime,
+  formatEventStart,
+  money,
+  releaseTime,
+  zonedTimeToIso,
+  type Deal,
+} from "@/lib/types";
 
 function text(form: FormData, key: string, max = 120) {
   const v = String(form.get(key) ?? "").trim().slice(0, max);
@@ -44,6 +56,13 @@ export async function createDeal(form: FormData) {
   const platform = text(form, "ticket_platform");
   const price = Number(String(form.get("price") ?? "").replace(/[^0-9.]/g, ""));
   const confirmed = form.get("confirm_holding") === "on";
+  const event_date = text(form, "event_date", 10);
+  const zone = text(form, "event_time_zone", 40) ?? "America/Los_Angeles";
+  const event_time_zone = EVENT_TIME_ZONES.some((z) => z.id === zone) ? zone : "America/Los_Angeles";
+  const event_starts_at = event_date ? zonedTimeToIso(event_date, text(form, "event_time", 5) ?? "", event_time_zone) : null;
+  if (!event_starts_at) redirect("/deals/new?error=time");
+  // The event has to be ahead of us: money is held until it happens.
+  if (new Date(event_starts_at).getTime() < Date.now()) redirect("/deals/new?error=past");
   if (
     !event_name ||
     !Number.isFinite(price) ||
@@ -62,7 +81,9 @@ export async function createDeal(form: FormData) {
       seller_id: user.id,
       seller_name: displayName(user.email),
       event_name,
-      event_date: text(form, "event_date", 10),
+      event_date,
+      event_starts_at,
+      event_time_zone,
       venue: text(form, "venue"),
       seats: text(form, "seats"),
       ticket_platform: platform,
@@ -121,7 +142,7 @@ export async function startPayment(form: FormData) {
           unit_amount: deal.price_cents,
           product_data: {
             name: `${deal.event_name} — tickets from ${deal.seller_name ?? "a friend"}`,
-            description: "Held by SwitchTix until you confirm the tickets arrived. The seller receives this full amount.",
+            description: "Held by SwitchTix until after the event, so the seller is paid once you get in. The seller receives this full amount.",
           },
         },
       },
@@ -175,14 +196,14 @@ export async function abandonPayment(form: FormData) {
   back(id);
 }
 
-/** Seller: tickets were sent through the ticket app. Starts the auto-release clock. */
+/** Seller: tickets were sent through the ticket app. Money stays held until shortly after the event starts. */
 export async function markSent(form: FormData) {
   const id = String(form.get("id") ?? "");
   const user = await signedIn(`/d/${id}`);
   const deal = await getDeal(id);
   if (!deal || deal.seller_id !== user.id) back(id);
   const now = new Date();
-  const autoRelease = new Date(now.getTime() + AUTO_RELEASE_HOURS * 3600_000).toISOString();
+  const autoRelease = releaseTime(deal!, now).toISOString();
   const { data: sent } = await adminClient()
     .from("deals")
     .update({ status: "sent", sent_at: now.toISOString(), auto_release_at: autoRelease, updated_at: now.toISOString() })
@@ -197,8 +218,8 @@ export async function markSent(form: FormData) {
       `Your ${d.event_name} tickets are on the way`,
       [
         `${d.seller_name ?? "The seller"} says they've sent your tickets through ${d.ticket_platform ?? "the ticket app"}.`,
-        `Open ${d.ticket_platform ?? "the ticket app"}, accept the transfer, then tap "I got the tickets" on SwitchTix.`,
-        `If anything's wrong, tap "Something's wrong" before ${formatDateTime(autoRelease)}. After that, the ${money(d.price_cents)} is released to the seller automatically.`,
+        `Open ${d.ticket_platform ?? "the ticket app"}, accept the transfer, then tap "I accepted the tickets" on SwitchTix.`,
+        `Your ${money(d.price_cents)} stays held until after the event. If you can't get in, tap "Something's wrong" before ${formatDateTime(autoRelease)}. After that, the money is released to the seller automatically.`,
       ],
       `/d/${d.id}`,
       "Open the deal",
@@ -207,22 +228,58 @@ export async function markSent(form: FormData) {
   back(id);
 }
 
-/** Buyer: tickets arrived. Releases the money to the seller. */
+/**
+ * Buyer: before the event, records that the transfer is accepted (the money stays held until the event).
+ * After the event has started, "I got in" pays the seller straight away.
+ */
 export async function confirmReceived(form: FormData) {
   const id = String(form.get("id") ?? "");
   const user = await signedIn(`/d/${id}`);
-  const deal = await getDeal(id);
-  if (!deal || deal.buyer_id !== user.id) back(id);
-  if (deal.status === "paid" || deal.status === "sent") await release(deal, "buyer_confirmed");
-  back(id, "released=1");
+  const found = await getDeal(id);
+  if (!found || found.buyer_id !== user.id) back(id);
+  const deal = await refreshDeal(found!);
+  if (deal.status !== "paid" && deal.status !== "sent") back(id);
+
+  if (eventStarted(deal)) {
+    await release(deal, "buyer_confirmed");
+    back(id, "released=1");
+  }
+
+  const now = new Date();
+  await adminClient()
+    .from("deals")
+    .update({
+      transfer_accepted_at: deal.transfer_accepted_at ?? now.toISOString(),
+      // Buyer accepted before the seller tapped "sent": treat the tickets as sent now.
+      ...(deal.status === "paid"
+        ? { status: "sent", sent_at: now.toISOString(), auto_release_at: releaseTime(deal, now).toISOString() }
+        : {}),
+      updated_at: now.toISOString(),
+    })
+    .eq("id", id)
+    .in("status", ["paid", "sent"]);
+  await emailUser(
+    deal.seller_id,
+    `${deal.buyer_name ?? "Your buyer"} accepted the ${deal.event_name} tickets`,
+    [
+      `${deal.buyer_name ?? "Your buyer"} says the tickets are in their ${deal.ticket_platform ?? "ticket app"} account.`,
+      `Your ${money(deal.price_cents)} is released ${DOOR_WINDOW_HOURS} hours after the event starts (${formatEventStart(deal)}), or sooner if they tap "I got in".`,
+    ],
+    `/d/${deal.id}`,
+    "Open the deal",
+  );
+  back(id, "accepted=1");
 }
 
 /** Buyer: something is wrong. Freezes the money until Tom reviews it. */
 export async function openDispute(form: FormData) {
   const id = String(form.get("id") ?? "");
   const user = await signedIn(`/d/${id}`);
-  const deal = await getDeal(id);
-  if (!deal || deal.buyer_id !== user.id || !["paid", "sent"].includes(deal.status)) back(id);
+  const found = await getDeal(id);
+  if (!found || found.buyer_id !== user.id) back(id);
+  // Bring the deal up to date first, so a report after the release time can't freeze released money.
+  const deal = await refreshDeal(found!);
+  if (!["paid", "sent"].includes(deal.status)) back(id);
   const reason = text(form, "reason", 1000);
   if (!reason) back(id, "error=reason");
 

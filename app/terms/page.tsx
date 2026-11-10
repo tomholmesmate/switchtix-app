@@ -16,8 +16,9 @@ export default function Terms() {
       <h2>What SwitchTix does</h2>
       <p>
         SwitchTix lets a seller create a deal link for tickets they hold. The buyer pays through Stripe and the money is
-        held until the buyer confirms the tickets arrived, or 48 hours after the seller marks them sent unless the buyer
-        reports a problem. Then the seller is paid. SwitchTix is not the seller or buyer of any ticket and is not
+        held until 2 hours after the event starts, unless the buyer reports a problem first. A buyer who gets in can tap
+        “I got in” to pay the seller sooner. If the tickets are sent after the event has started, the money is held 48
+        hours instead. Then the seller is paid. SwitchTix is not the seller or buyer of any ticket and is not
         connected to Ticketmaster, AXS, SeatGeek or any event organizer.
       </p>
 
@@ -38,7 +39,7 @@ export default function Terms() {
       <h2>Buying and fees</h2>
       <ul>
         <li>Every deal shows the full price before you pay: the ticket price plus payment processing, which is exactly what Stripe charges. SwitchTix keeps nothing from it.</li>
-        <li>Accept the transfer in your ticket app, then tap “I got the tickets”. If something’s wrong, tap “Something’s wrong” before the 48 hours are up.</li>
+        <li>Accept the transfer in your ticket app, then tap “I accepted the tickets”. If the tickets don’t arrive or don’t scan at the door, tap “Something’s wrong” before the release time shown on the deal (2 hours after the event starts).</li>
       </ul>
 
       <h2>Problems and refunds</h2>

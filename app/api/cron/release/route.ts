@@ -4,7 +4,7 @@ import { adminClient } from "@/lib/supabase";
 import type { Deal } from "@/lib/types";
 
 /**
- * Daily safety net (Vercel Cron): releases deals whose 48-hour window has passed and
+ * Daily safety net (Vercel Cron): releases deals whose release time (2 hours after the event starts) has passed and
  * catches payments whose buyer closed the browser before returning to SwitchTix.
  * Deals are also brought up to date whenever someone opens them.
  */

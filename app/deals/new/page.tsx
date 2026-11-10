@@ -1,4 +1,4 @@
-import { TICKET_PLATFORMS } from "@/lib/types";
+import { DOOR_WINDOW_HOURS, EVENT_TIME_ZONES, TICKET_PLATFORMS } from "@/lib/types";
 import { createDeal } from "../actions";
 
 export default async function NewDeal({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -8,8 +8,8 @@ export default async function NewDeal({ searchParams }: { searchParams: Promise<
       <h1>Start a deal</h1>
       <p className="muted">
         Selling tickets you already have? Create a deal link and send it to your buyer. Their money waits safely with
-        SwitchTix until they confirm the tickets arrived. You keep 100% of your price; the buyer pays Stripe’s payment
-        processing, and SwitchTix keeps nothing.
+        SwitchTix, and you get paid when they get in: {DOOR_WINDOW_HOURS} hours after the event starts, unless they report a
+        problem. You keep 100% of your price; the buyer pays Stripe’s payment processing, and SwitchTix keeps nothing.
       </p>
       <form action={createDeal} className="panel">
         <label htmlFor="event_name">Event *</label>
@@ -17,14 +17,32 @@ export default async function NewDeal({ searchParams }: { searchParams: Promise<
 
         <div className="row2">
           <div>
-            <label htmlFor="event_date">Date</label>
-            <input id="event_date" name="event_date" type="date" />
+            <label htmlFor="event_date">Date *</label>
+            <input id="event_date" name="event_date" type="date" required />
+          </div>
+          <div>
+            <label htmlFor="event_time">Start time *</label>
+            <input id="event_time" name="event_time" type="time" required />
+          </div>
+        </div>
+
+        <div className="row2">
+          <div>
+            <label htmlFor="event_time_zone">Time zone</label>
+            <select id="event_time_zone" name="event_time_zone" defaultValue="America/Los_Angeles">
+              {EVENT_TIME_ZONES.map((z) => (
+                <option key={z.id} value={z.id}>{z.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label htmlFor="venue">Venue</label>
             <input id="venue" name="venue" placeholder="Golden Gate Park" />
           </div>
         </div>
+        <p className="muted small" style={{ margin: "6px 0 0" }}>
+          Use the time on the ticket (doors or show time). Your money releases {DOOR_WINDOW_HOURS} hours after it.
+        </p>
 
         <label htmlFor="seats">Seats or ticket type</label>
         <input id="seats" name="seats" placeholder="Sec 112, Row F, Seats 3–4 · or GA" />
@@ -52,7 +70,9 @@ export default async function NewDeal({ searchParams }: { searchParams: Promise<
         {error === "invite" && (
           <div className="notice bad">Selling is invite-only during the beta. Ask Tom to add your email, then try again.</div>
         )}
-        {error && error !== "invite" && (
+        {error === "time" && <div className="notice bad">Add the event’s date and start time.</div>}
+        {error === "past" && <div className="notice bad">That start time has already passed. Check the date and time.</div>}
+        {error && !["invite", "time", "past"].includes(error) && (
           <div className="notice bad">Fill in the event, the ticket app, a price between $1 and $5,000, and tick the box.</div>
         )}
         <button className="btn block" type="submit">Create deal link</button>

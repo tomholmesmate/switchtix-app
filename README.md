@@ -5,7 +5,7 @@
 An invite-only web app where friends:
 
 - **Mint stubs** — upload a photo of a ticket stub, add the details and a note, and get a keepsake card they can share. Each stub is minted on **Base Sepolia**, a free blockchain test network.
-- **Sell tickets through escrow** — the buyer pays with a Stripe **test** card, SwitchTix holds the money, and it's released to the seller only when the buyer confirms the tickets arrived (or 48 hours pass with no problem reported). No real money moves in the beta.
+- **Sell tickets through escrow** — the buyer pays with a Stripe **test** card, SwitchTix holds the money, and it's released to the seller 2 hours after the event starts unless the buyer reports a problem ("seller gets paid when you get in"). No real money moves in the beta.
 - **Install it** — open the site on a phone and choose *Add to Home Screen*.
 
 Everything runs on free tiers. Nothing needs to be installed on your PC.
@@ -75,10 +75,10 @@ update auth.users set raw_app_meta_data = raw_app_meta_data - 'password_set' whe
 
 **How a deal works**
 
-1. Seller creates a deal link (must send through Ticketmaster, AXS or SeatGeek transfer — no PDFs).
+1. Seller creates a deal link with the event's date and start time (must send through Ticketmaster, AXS or SeatGeek transfer — no PDFs).
 2. Buyer pays into escrow with a test card: `4242 4242 4242 4242`, any future date, any CVC/ZIP.
 3. Seller sends the tickets in the ticket app and taps **I've sent the tickets**.
-4. Buyer taps **I got the tickets**, or the money releases automatically 48 hours later unless they report a problem.
+4. Buyer accepts the transfer and taps **I accepted the tickets**; the money stays held. It releases automatically 2 hours after the event starts unless they report a problem, or sooner if they tap **I got in**. (If tickets are sent after the event has started, or an older deal has no start time, it's 48 hours after sending.)
 5. Seller sets up payouts once (Payouts page, using Stripe's test details shown there) and the money is transferred.
 
 Problems go to the **Admin** page, where you release to the seller or refund the buyer.
