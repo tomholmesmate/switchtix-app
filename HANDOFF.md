@@ -1,6 +1,8 @@
 # SwitchTix Handoff
 
-Oct 30, 2026 · Tom Holmes
+Oct 30, 2026 · Tom Holmes · updated Nov 10, 2026
+
+**Nov 10 update:** money now releases 2 hours after the event starts ("seller gets paid when you get in"), Google sign-in is on, and a full test-card deal has been run end to end. The business model (free for fans forever; brokers, tips and a protection pool pay the costs) is in the **SwitchTix Escrow & Business Model** doc: https://claude.ai/artifact/32vdKMkLYDRimS8x4cdf4Y
 
 The live, editable version of this handoff (with the drawn deal-flow diagram) is the **SwitchTix Handoff** doc:
 https://claude.ai/artifact/1e3NjiWvgV8mqZ16MpHwZQ
@@ -45,7 +47,7 @@ The product is **escrow first**: a fair, transparent way for strangers to trade 
 - **Deal links**: seller enters event, date, venue, seats, ticket app and price, confirms they hold the tickets, shares the link.
 - **Escrow checkout**: buyer pays ticket + payment processing through Stripe; money is held until release.
 - **Itemized price** on every deal: card processing, payout cost, Stripe's monthly seller fee, "SwitchTix keeps $0.00".
-- **Release flow**: seller taps "I've sent the tickets" → buyer taps "I got the tickets" (or 48 h auto-release) → money transfers to seller.
+- **Release flow**: seller taps "I've sent the tickets" → buyer taps "I accepted the tickets" (money stays held) → money releases 2 h after the event starts unless the buyer reports a problem, or right away if the buyer taps "I got in" after the start.
 - **"Something's wrong"** button freezes the money, with a reason and screenshot.
 - **Admin page** (ADMIN_EMAILS only) to review disputes and release or refund.
 - **Payouts page**: sellers set up Stripe Connect Express only once they have money waiting.
@@ -61,7 +63,7 @@ The product is **escrow first**: a fair, transparent way for strangers to trade 
  1 Seller shares link ──► 2 Buyer pays (money held) ──► 3 Seller sends tickets in issuer app
         │                         │                               │
         │        seller cancels before sending                    ▼
-        │                         ▼                     4 Buyer confirms (or 48 h pass)
+        │                         ▼                     4 Buyer accepts; event + 2 h
         │                  Buyer refunded                         │
         │                         ▲                               ▼
         │                         │ refund                 5 Seller is paid (SwitchTix keeps $0)
@@ -71,7 +73,7 @@ The product is **escrow first**: a fair, transparent way for strangers to trade 
 
 Rules:
 - Only tickets sent through the issuer's own transfer (Ticketmaster, AXS, SeatGeek); the seller confirms they hold the tickets.
-- Buyer can confirm any time after paying; otherwise release is automatic 48 h after the seller marks tickets sent.
+- Release is automatic 2 h after the event starts. Before the start, the buyer's "I accepted the tickets" only records the transfer; after the start, "I got in" releases at once. Deals with no future start time fall back to 48 h after "sent".
 - Before sending, only the seller can cancel (buyer refunded in full). Once paid, a buyer with a problem reports it instead of cancelling.
 - A dispute freezes the money until you release or refund from Admin.
 - Sellers set up payouts the first time money is waiting; it then transfers automatically.
@@ -107,7 +109,7 @@ Later monetization (not built): optional instant payouts (~1%), premium memory s
 | Vercel | Hosts the app; redeploys on every push to main | Hobby |
 | Supabase | Database, sign-in, photo/screenshot storage | Free |
 | Stripe (test mode) | Escrow payments and payouts (Connect enabled) | Free in test |
-| Google Cloud (optional) | Google sign-in key | Free |
+| Google Cloud (project "SwitchTix") | Google sign-in key; app published, no logo (a logo triggers Google review) | Free |
 | Gmail app password (optional) | Email updates | Free |
 
 Vercel environment variables:
@@ -120,7 +122,7 @@ Vercel environment variables:
 | STRIPE_SECRET_KEY | Stripe → Developers → API keys (sk_test_…) | Set |
 | ADMIN_EMAILS | Your email | Set |
 | CRON_SECRET | Any long random text | Set |
-| NEXT_PUBLIC_GOOGLE_SIGNIN | Not needed: Google appears automatically once on in Supabase (`off` hides it) | Not needed |
+| NEXT_PUBLIC_GOOGLE_SIGNIN | Not needed: Google appears automatically once on in Supabase (`off` hides it) | Not needed (Google is on as of Nov 10) |
 | SMTP_USER, SMTP_PASS, SMTP_FROM | Gmail address + app password | Not yet |
 | MINTER_PRIVATE_KEY, STUB_CONTRACT_ADDRESS | Phase 2 minting | Not yet |
 | NEXT_PUBLIC_SITE_URL | Only for a custom domain | Not needed |
@@ -140,20 +142,37 @@ Invite a seller:
 insert into public.invites (email) values ('friend@example.com') on conflict do nothing;
 ```
 
+Test accounts without new inboxes: sign in by email as `you+buyer@gmail.com`, `you+buyer2@gmail.com` and so on (Google's button always uses your real account). Buyers need no invite; extra sellers do.
+
 Reset someone's password (their next password becomes the new one):
 ```sql
 update auth.users set raw_app_meta_data = raw_app_meta_data - 'password_set' where email = 'friend@example.com';
 ```
 
+Wipe test data and start over. Deals only:
+```sql
+delete from public.stubs;
+delete from public.deals;
+```
+Everything, including accounts (the invite list stays; sellers redo payout setup):
+```sql
+delete from public.stubs;
+delete from public.deals;
+delete from public.payout_accounts;
+delete from auth.users;
+```
+
 ## Pick-up checklist
 
 Finish the beta (free):
-- [ ] Run the processing-fee SQL above
+- [x] Run the processing-fee SQL above (Nov 10, with escrow.sql section 6)
+- [x] Release 2 h after the event starts (PR #1, Nov 10)
+- [x] Run a test-card deal end to end (Nov 10)
 - [ ] Stripe test mode → Settings → Payment methods: turn on Apple Pay, Google Pay, Cash App Pay, Link
 - [ ] Finish a seller's Payouts setup with the test details shown on that page; confirm the transfer in Stripe → Connect
 - [ ] Run one dispute end to end and resolve it on Admin
 - [ ] Turn on email updates (README Part 4c, ~5 min)
-- [ ] Turn on Google in Google Cloud + Supabase (README Part 4b, ~15 min); the button then appears by itself
+- [x] Turn on Google in Google Cloud + Supabase (Nov 10)
 - [ ] Invite 10–15 sellers: concert friends, a season-ticket holder, sports parents
 - [ ] Run for two weeks; record repeat deals, buyers who later sell, where people got stuck
 
@@ -165,6 +184,7 @@ Before real money:
 - [ ] Upgrade to Vercel Pro and Supabase Pro
 - [ ] Allow live Stripe keys (one change in `lib/stripe.ts`)
 - [ ] Point a domain (e.g. app.switchtix.io) and set NEXT_PUBLIC_SITE_URL
+- [ ] Supabase custom auth domain, so Google's screen says SwitchTix instead of "…supabase.co" (paid add-on)
 - [ ] Small real-money pilot group first
 
 ## Roadmap
@@ -194,6 +214,7 @@ Next.js 16 (Turbopack, `proxy.ts`), React 19, TypeScript, Supabase (@supabase/ss
 | Phase 2 minting | `lib/chain.ts`, `lib/mint.ts`, `contracts/SwitchTixStubs.sol` | README Part 5 |
 
 Known limits:
+- The release job runs once a day on Vercel's free plan, so a seller can wait up to a day past the release time unless the buyer taps "I got in" or someone opens the deal.
 - Stripe can hold funds ~90 days; far-off events may need a two-step hold before real money.
 - Cancelled events refund the original purchaser (the seller); a pass-through rule is still needed.
 - Chargebacks ("friendly fraud") are the biggest money risk; keep transfer screenshots.
